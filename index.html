@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ραντεβού Radar — eid.gov.gr slot monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0D1321;
+    --panel: #151D30;
+    --panel-2: #101828;
+    --line: #26314B;
+    --text: #E4EAF6;
+    --muted: #8792A8;
+    --blue: #4E9DE0;
+    --amber: #F5A623;
+    --green: #34C98E;
+    --red: #E5484D;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+    --sans: "Inter", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 32px 16px 80px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+
+  header { margin-bottom: 28px; }
+  header h1 {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  header h1 .dot { color: var(--blue); }
+  header p { color: var(--muted); margin-top: 4px; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card h2 {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  textarea, select, input[type="number"] {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    padding: 8px 10px;
+  }
+  textarea { resize: vertical; min-height: 64px; }
+  textarea:focus, select:focus, input:focus, button:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
+  }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .row-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px; }
+  @media (max-width: 640px) { .row, .row-4 { grid-template-columns: 1fr; } }
+
+  .deptlist {
+    margin-top: 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel-2);
+    max-height: 180px;
+    overflow-y: auto;
+    padding: 6px;
+  }
+  .deptlist:empty { display: none; }
+  .deptlist .dept {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    padding: 5px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .deptlist .dept:hover { background: rgba(78,157,224,0.08); }
+  .deptlist .dept input { accent-color: var(--blue); }
+  .deptlist .dept .addr { color: var(--muted); font-size: 11px; }
+
+  .checkline { display: flex; align-items: center; gap: 8px; margin-top: 18px; font-size: 13px; color: var(--text); }
+  .checkline input { accent-color: var(--blue); }
+
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; }
+  button {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 9px 18px;
+    cursor: pointer;
+    background: var(--panel-2);
+    color: var(--text);
+  }
+  button.primary { background: var(--blue); border-color: var(--blue); color: #0A1220; }
+  button.danger { background: transparent; border-color: var(--red); color: var(--red); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* signature: status strip */
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 14px 18px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel);
+    margin-bottom: 16px;
+  }
+  .pulse {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+  }
+  .status.scanning .pulse { background: var(--blue); animation: pulse 1.2s ease-in-out infinite; }
+  .status.waiting  .pulse { background: var(--green); animation: pulse 2.4s ease-in-out infinite; }
+  .status.alert    .pulse { background: var(--amber); animation: pulse 0.6s ease-in-out infinite; }
+  .status.dead     .pulse { background: var(--red); }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(78,157,224,0.18); } }
+  @media (prefers-reduced-motion: reduce) { .pulse { animation: none !important; } }
+  .status .count { margin-left: auto; color: var(--muted); }
+
+  .banner {
+    display: none;
+    border: 1px solid var(--red);
+    background: rgba(229,72,77,0.08);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    font-size: 13px;
+  }
+  .banner code {
+    display: block;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    background: var(--panel-2);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-top: 8px;
+    word-break: break-all;
+    user-select: all;
+  }
+
+  /* results */
+  .ticket {
+    border: 1px solid var(--amber);
+    background: rgba(245,166,35,0.07);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+  }
+  .ticket .when {
+    font-family: var(--mono);
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--amber);
+  }
+  .ticket .where { margin-top: 2px; }
+  .ticket .addr { color: var(--muted); font-size: 12px; }
+
+  .nearest {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 18px;
+    background: var(--panel);
+    margin-bottom: 16px;
+  }
+  .nearest .when { font-family: var(--mono); font-size: 15px; color: var(--blue); font-weight: 600; }
+  .nearest .addr { color: var(--muted); font-size: 12px; }
+
+  .log {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    color: var(--muted);
+  }
+  .log .ok { color: var(--green); }
+  .log .warn { color: var(--amber); }
+  .log .err { color: var(--red); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>ΡΑΝΤΕΒΟΥ RADAR<span class="dot">_</span></h1>
+    <p>Watches eid.gov.gr police appointment slots and beeps when one opens inside your window.</p>
+  </header>
+
+  <div class="banner" id="banner"></div>
+
+  <div class="card">
+    <h2>Session</h2>
+    <div id="sessionLine" style="font-family:var(--mono);font-size:12.5px;color:var(--muted)">
+      Checking session…
+    </div>
+    <textarea id="token" spellcheck="false" placeholder="ctaf2 DRXw3oaTl37au3xJ..."
+      style="display:none;margin-top:10px"></textarea>
+  </div>
+
+  <div class="card">
+    <h2>Where</h2>
+    <div class="row">
+      <div>
+        <label for="region">Περιφέρεια (region)</label>
+        <select id="region"></select>
+      </div>
+      <div>
+        <label for="pref">Περιφερειακή ενότητα (prefecture)</label>
+        <select id="pref"></select>
+      </div>
+    </div>
+    <div class="deptlist" id="deptlist"></div>
+    <div class="checkline">
+      <input type="checkbox" id="selall" checked>
+      <label for="selall" style="margin:0;color:var(--text)">Check all departments in this prefecture</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>When to alert</h2>
+    <div class="row-4">
+      <div>
+        <label for="days">Alert window (days)</label>
+        <input type="number" id="days" value="5" min="1" max="180">
+      </div>
+      <div>
+        <label for="interval">Scan every (min)</label>
+        <input type="number" id="interval" value="5" min="1" max="120">
+      </div>
+      <div class="checkline" style="margin-top:22px">
+        <input type="checkbox" id="onlynew" checked>
+        <label for="onlynew" style="margin:0;color:var(--text)">Only new slots</label>
+      </div>
+      <div class="checkline" style="margin-top:22px">
+        <input type="checkbox" id="stoponfound">
+        <label for="stoponfound" style="margin:0;color:var(--text)">Stop when found</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="card controls">
+    <button class="primary" id="startBtn">Start watching</button>
+    <button class="danger" id="stopBtn" disabled>Stop</button>
+    <button id="beepBtn">Test beep</button>
+  </div>
+
+  <div class="status" id="status">
+    <div class="pulse"></div>
+    <span id="statusText">Idle — fill in the token and press Start.</span>
+    <span class="count" id="countdown"></span>
+  </div>
+
+  <div id="urgentBox"></div>
+  <div id="nearestBox"></div>
+
+  <div class="log" id="log">Log will appear here.</div>
+</div>
+
+<script>
+/* ==== data injected from the site's own NearDepartments response ==== */
+const LABELS = [{"id":2821,"name":"ΑΝ. ΜΑΚΕΔΟΝΙΑΣ & ΘΡΑΚΗΣ","childs":[{"id":2822,"name":"ΔΡΑΜΑΣ"},{"id":2897,"name":"ΕΒΡΟΥ"},{"id":2879,"name":"ΘΑΣΟΥ"},{"id":2893,"name":"ΚΑΒΑΛΑΣ"},{"id":2830,"name":"ΞΑΝΘΗΣ"},{"id":2862,"name":"ΡΟΔΟΠΗΣ"}]},{"id":2823,"name":"ΑΤΤΙΚΗΣ","childs":[{"id":2824,"name":"ΑΝΑΤΟΛΙΚΗΣ ΑΤΤΙΚΗΣ"},{"id":2902,"name":"ΒΟΡΕΙΟΥ ΤΟΜΕΑ ΑΘΗΝΩΝ"},{"id":2905,"name":"ΔΥΤΙΚΗΣ ΑΤΤΙΚΗΣ"},{"id":2901,"name":"ΔΥΤΙΚΟΥ ΤΟΜΕΑ ΑΘΗΝΩΝ"},{"id":2825,"name":"ΚΕΝΤΡΙΚΟΥ ΤΟΜΕΑ ΑΘΗΝΩΝ"},{"id":2843,"name":"ΝΗΣΩΝ"},{"id":2903,"name":"ΝΟΤΙΟΥ ΤΟΜΕΑ ΑΘΗΝΩΝ"},{"id":2906,"name":"ΠΕΙΡΑΙΩΣ"}]},{"id":2831,"name":"ΒΟΡΕΙΟΥ ΑΙΓΑΙΟΥ","childs":[{"id":2837,"name":"ΙΚΑΡΙΑΣ"},{"id":2832,"name":"ΛΕΣΒΟΥ"},{"id":2891,"name":"ΛΗΜΝΟΥ"},{"id":2884,"name":"ΣΑΜΟΥ"},{"id":2883,"name":"ΧΙΟΥ"}]},{"id":2835,"name":"ΔΥΤΙΚΗΣ ΕΛΛΑΔΑΣ","childs":[{"id":2836,"name":"ΑΙΤΩΛΟΑΚΑΡΝΑΝΙΑΣ"},{"id":2844,"name":"ΑΧΑΪΑΣ"},{"id":2855,"name":"ΗΛΕΙΑΣ"}]},{"id":2851,"name":"ΔΥΤΙΚΗΣ ΜΑΚΕΔΟΝΙΑΣ","childs":[{"id":2873,"name":"ΓΡΕΒΕΝΩΝ"},{"id":2860,"name":"ΚΑΣΤΟΡΙΑΣ"},{"id":2865,"name":"ΚΟΖΑΝΗΣ"},{"id":2852,"name":"ΦΛΩΡΙΝΑΣ"}]},{"id":2868,"name":"ΗΠΕΙΡΟΥ","childs":[{"id":2871,"name":"ΑΡΤΑΣ"},{"id":2895,"name":"ΘΕΣΠΡΩΤΙΑΣ"},{"id":2869,"name":"ΙΩΑΝΝΙΝΩΝ"},{"id":2877,"name":"ΠΡΕΒΕΖΑΣ"}]},{"id":2826,"name":"ΘΕΣΣΑΛΙΑΣ","childs":[{"id":2887,"name":"ΚΑΡΔΙΤΣΑΣ"},{"id":2827,"name":"ΛΑΡΙΣΑΣ"},{"id":2847,"name":"ΜΑΓΝΗΣΙΑΣ"},{"id":2899,"name":"ΣΠΟΡΑΔΩΝ"},{"id":2888,"name":"ΤΡΙΚΑΛΩΝ"}]},{"id":2849,"name":"ΙΟΝΙΩΝ ΝΗΣΩΝ","childs":[{"id":2850,"name":"ΖΑΚΥΝΘΟΥ"},{"id":2881,"name":"ΙΘΑΚΗΣ"},{"id":2866,"name":"ΚΕΡΚΥΡΑΣ"},{"id":2894,"name":"ΚΕΦΑΛΛΗΝΙΑΣ"},{"id":2859,"name":"ΛΕΥΚΑΔΑΣ"}]},{"id":2828,"name":"ΚΕΝΤΡΙΚΗΣ ΜΑΚΕΔΟΝΙΑΣ","childs":[{"id":2904,"name":"ΗΜΑΘΙΑΣ"},{"id":2829,"name":"ΘΕΣΣΑΛΟΝΙΚΗΣ"},{"id":2872,"name":"ΚΙΛΚΙΣ"},{"id":2848,"name":"ΠΕΛΛΑΣ"},{"id":2874,"name":"ΠΙΕΡΙΑΣ"},{"id":2854,"name":"ΣΕΡΡΩΝ"},{"id":2838,"name":"ΧΑΛΚΙΔΙΚΗΣ"}]},{"id":2833,"name":"ΚΡΗΤΗΣ","childs":[{"id":2864,"name":"ΗΡΑΚΛΕΙΟΥ"},{"id":2898,"name":"ΛΑΣΙΘΙΟΥ"},{"id":2834,"name":"ΡΕΘΥΜΝΟΥ"},{"id":2858,"name":"ΧΑΝΙΩΝ"}]},{"id":2856,"name":"ΝΟΤΙΟΥ ΑΙΓΑΙΟΥ","childs":[{"id":2857,"name":"ΑΝΔΡΟΥ"},{"id":2880,"name":"ΘΗΡΑΣ"},{"id":2882,"name":"ΚΑΛΥΜΝΟΥ"},{"id":2885,"name":"ΚΑΡΠΑΘΟΥ"},{"id":2886,"name":"ΚΕΑΣ - ΚΥΘΝΟΥ"},{"id":2878,"name":"ΚΩ"},{"id":2889,"name":"ΜΗΛΟΥ"},{"id":2890,"name":"ΜΥΚΟΝΟΥ"},{"id":2892,"name":"ΝΑΞΟΥ"},{"id":2896,"name":"ΠΑΡΟΥ"},{"id":2863,"name":"ΡΟΔΟΥ"},{"id":2907,"name":"ΣΥΡΟΥ"},{"id":2900,"name":"ΤΗΝΟΥ"}]},{"id":2839,"name":"ΠΕΛΟΠΟΝΝΗΣΟΥ","childs":[{"id":2876,"name":"ΑΡΓΟΛΙΔΑΣ"},{"id":2867,"name":"ΑΡΚΑΔΙΑΣ"},{"id":2840,"name":"ΚΟΡΙΝΘΙΑΣ"},{"id":2861,"name":"ΛΑΚΩΝΙΑΣ"},{"id":2870,"name":"ΜΕΣΣΗΝΙΑΣ"}]},{"id":2841,"name":"ΣΤΕΡΕΑΣ ΕΛΛΑΔΑΣ","childs":[{"id":2845,"name":"ΒΟΙΩΤΙΑΣ"},{"id":2846,"name":"ΕΥΒΟΙΑΣ"},{"id":2842,"name":"ΕΥΡΥΤΑΝΙΑΣ"},{"id":2853,"name":"ΦΘΙΩΤΙΔΑΣ"},{"id":2875,"name":"ΦΩΚΙΔΑΣ"}]}];
+const DEPARTMENTS = [{"id":4829,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΒΔΗΡΩΝ","address":"Γενισέα Ξάνθης","labelId":2830},{"id":4830,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΓΙΑΣ","address":"Ευστρατιάδη 32, 400 03","labelId":2827},{"id":4831,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΓΙΑΣ ΠΑΡΑΣΚΕΥΗΣ","address":"811 02, Αγ. Παρασκευή","labelId":2832},{"id":4832,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΓΙΑΣΟΥ","address":"811 01, Αγιάσος","labelId":2832},{"id":4833,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΓΙΟΥ ΒΑΣΙΛΕΙΟΥ","address":"Σπήλι, 740 53","labelId":2834},{"id":4834,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΓΙΟΥ ΒΛΑΣΙΟΥ","address":"Αγ. Βλάσιος, 30021","labelId":2836},{"id":4835,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΓΙΟΥ ΚΗΡΥΚΟΥ","address":"833 00, Αγ. Κήρυκος","labelId":2837},{"id":4837,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΓΙΩΝ ΘΕΟΔΩΡΩΝ","address":"Αγ. Θεόδωροι Π.Ε.Ο. Α.Κ., 200 03","labelId":2840},{"id":4838,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΓΡΑΦΩΝ","address":"360 71, Κερασοχώρι","labelId":2842},{"id":4839,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΙΓΙΝΑΣ","address":"Λ. Λαδά 12, 180 10","labelId":2843},{"id":4840,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΙΤΩΛΙΚΟΥ","address":"Κ. Λάσκαρη 45, 304 00","labelId":2836},{"id":4841,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΚΡΑΤΑΣ","address":"Νικ. Σολιώτη, 250 06","labelId":2844},{"id":4842,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΚΤΙΟΥ – ΒΟΝΙΤΣΑΣ","address":"Ιερομονάχου Ιακώβου, 300 02","labelId":2836},{"id":4843,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΛΙΑΡΤΟΥ","address":"Λ. Αθηνών α/α, 320 01","labelId":2845},{"id":4844,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΛΙΒΕΡΙΟΥ","address":"Ταμυνέων 53, 345 00","labelId":2846},{"id":4845,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΛΜΥΡΟΥ","address":"Β. Γεωργίου Β΄ 45, 371 00","labelId":2847},{"id":4846,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΛΜΩΠΙΑΣ","address":"Διοικητηρίου 1,  Αριδαία","labelId":2848},{"id":4847,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΛΥΚΩΝ","address":"Καταστάρι, 290 90","labelId":2850},{"id":4848,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΜΑΡΙΟΥ","address":"Φουρφουράς Δήμος Αμαρίου Ρεθύμνου","labelId":2834},{"id":4849,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΜΥΝΤΑΙΟΥ","address":"Αγ. Παρασκευής 1, 532 00","labelId":2852},{"id":4850,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΜΦΙΚΛΕΙΑΣ – ΕΛΑΤΕΙΑΣ","address":"Σκουρολιάκου & Παρνασσού, 350 02","labelId":2853},{"id":4851,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΜΦΙΛΟΧΙΑΣ","address":"Τσιρογιάννη 100, 305 00","labelId":2836},{"id":4852,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΜΦΙΠΟΛΗΣ","address":"620 47, Ροδολίβος","labelId":2854},{"id":4853,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΝΔΡΑΒΙΔΑΣ – ΚΥΛΛΗΝΗΣ","address":"Εργατικές Κατοικίες αρ. 1 Λεχαινά, 270 53","labelId":2855},{"id":4854,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΝΔΡΙΤΣΑΙΝΑΣ","address":"270 61, Ανδρίτσαινα","labelId":2855},{"id":4855,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΝΔΡΟΥ","address":"Εμπειρίκου 2, 845 00","labelId":2857},{"id":4856,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΝΩΓΕΙΩΝ","address":"740 51, Ανώγεια","labelId":2834},{"id":4857,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΠΟΚΟΡΩΝΟΥ","address":"Βρύσες Αποκορώνου Χανίων, 730 07","labelId":2858},{"id":4858,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΠΟΛΛΩΝΙΩΝ","address":"310 82, Βασιλική Λευκάδας","labelId":2859},{"id":4859,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΡΓΟΥΣ ΟΡΕΣΤΙΚΟΥ","address":"Πλ. Βογιατζάκη, 522 00","labelId":2860},{"id":4860,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΡΕΟΠΟΛΗΣ","address":"1ο χλμ. Επ.Ο. Αρεόπολης-Γερολιμένα, 230 62","labelId":2861},{"id":4861,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΡΝΑΙΑΣ","address":"630 74, Αρναία","labelId":2838},{"id":4862,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΡΡΙΑΝΩΝ","address":"693 00, Φίλλυρα","labelId":2862},{"id":4863,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΡΧΑΓΓΕΛΟΥ","address":"851 02, Αρχάγγελος","labelId":2863},{"id":4864,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΡΧΑΙΑΣ ΟΛΥΜΠΙΑΣ","address":"Π.Σπηλιπούλου 5, 270 65","labelId":2855},{"id":4865,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΣΤΕΡΟΥΣΙΩΝ","address":"700 10, Πύργος Μονοφατσίου","labelId":2864},{"id":5186,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΑΧΙΛΛΕΙΩΝ","address":"491 00, Μπενίτσες","labelId":2866},{"id":4866,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΒΕΛΟΥ – ΒΟΧΑΣ","address":"Λ.Πατρών 125, 200 06","labelId":2840},{"id":4867,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΒΕΥΗΣ","address":"530 74, Βεύη","labelId":2852},{"id":4868,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΒΙΑΝΝΟΥ","address":"700 04, Άνω Βιάνος","labelId":2864},{"id":4869,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΒΙΣΑΛΤΙΑΣ","address":"622 00, Νιγρίτα","labelId":2854},{"id":4870,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΒΟΪΟΥ","address":"Τσίπειο Οικοτροφείο, 503 00 Σιάτιστα","labelId":2865},{"id":4871,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΒΟΙΩΝ","address":"230 53, Νεάπολη","labelId":2861},{"id":5182,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΒΟΛΒΗΣ","address":"Παύλου Μελά 2, 570 21","labelId":2829},{"id":4872,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΒΟΡΕΙΑΣ ΚΕΡΚΥΡΑΣ","address":"490 81, Καρουσάδες","labelId":2866},{"id":4873,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΒΟΡΕΙΑΣ ΚΥΝΟΥΡΙΑΣ","address":"220 01, Παράλιο Αρκαδίας","labelId":2867},{"id":4874,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΒΟΡΕΙΟΥ ΠΗΛΙΟΥ","address":"Πλατεία Ανακασιάς, 385 00","labelId":2847},{"id":4875,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΒΟΡΕΙΩΝ ΤΖΟΥΜΕΡΚΩΝ","address":"440 01, Πράμαντα","labelId":2869},{"id":4876,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΒΟΥΠΡΑΣΙΑΣ","address":"270 52, Βάρδα","labelId":2855},{"id":4877,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΓΑΡΓΑΛΙΑΝΩΝ","address":"244 00, Γαργαλιάνοι","labelId":2870},{"id":4878,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΓΕΡΑΣ","address":"811 06, Παπάδος Λέσβου","labelId":2832},{"id":4879,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΓΕΩΡΓΙΟΥ ΚΑΡΑΪΣΚΑΚΗ","address":"Άνω Καλεντίνης Άρτας, 470 44","labelId":2871},{"id":4880,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΓΟΡΤΥΝΙΑΣ","address":"220 07, Δημητσάνα","labelId":2867},{"id":4881,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΓΟΥΜΕΝΙΣΣΑΣ","address":"613 00, Γουμένισσα","labelId":2872},{"id":4882,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΓΥΘΕΙΟΥ","address":"Βασ. Παύλου 21, 232 00","labelId":2861},{"id":4883,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΔΕΣΚΑΤΗΣ","address":"512 00, Δεσκάτη","labelId":2873},{"id":4884,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΔΙΟΥ – ΟΛΥΜΠΟΥ","address":"Αγ. Νικολάου 15, 602 00","labelId":2874},{"id":4885,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΔΙΡΦΥΩΝ - ΜΕΣΣΑΠΙΩΝ","address":"16η χ/θ Ε.Ο. Χαλκίδας - Αιδηψού, 344 00","labelId":2846},{"id":4886,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΔΙΣΤΟΜΟΥ – ΑΡΑΧΟΒΑΣ – ΑΝΤΙΚΥΡΑΣ","address":"Ιωάσαφ Καστρίτη, 320 05","labelId":2845},{"id":4887,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΔΟΜΟΚΟΥ","address":"Θέμιδος 4, 350 10","labelId":2853},{"id":5201,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΔΟΞΑΤΟΥ","address":"663 00, Δοξάτο","labelId":2822},{"id":4888,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΔΥΤΙΚΗΣ ΜΑΝΗΣ","address":"240 22, Καρδαμύλη","labelId":2870},{"id":4889,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΔΩΔΩΝΗΣ","address":"Τύρια Μπαουσιών Δωδώνης, 455 00","labelId":2869},{"id":4890,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΔΩΡΙΔΟΣ","address":"330 53, Λιδορίκι","labelId":2875},{"id":4891,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΕΛΑΣΣΟΝΑΣ","address":"6ης Οκτωβρίου 77, 402 00","labelId":2827},{"id":4892,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΕΛΛΟΜΕΝΟΥ","address":"310 84, Βλυχό Λευκάδας","labelId":2859},{"id":4893,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΕΜΜΑΝΟΥΗΛ ΠΑΠΠΑ","address":"620 46, Χρυσό","labelId":2854},{"id":4894,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΕΜΠΕΣΟΥ","address":"300 17, Εμπεσός","labelId":2836},{"id":4895,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΕΠΙΔΑΥΡΟΥ","address":"Λυγούρι Αργολίδας, 210 52","labelId":2876},{"id":5189,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΕΡΕΣΟΥ - ΑΝΤΙΣΣΗΣ","address":"811 03, Άντισσα","labelId":2832},{"id":4896,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΕΡΕΤΡΙΑΣ","address":"Σωσικράτους Αγάθωνος & Εύνομου Κηφισού, 340 08","labelId":2846},{"id":4897,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΕΡΜΙΟΝΙΔΑΣ","address":"Αγίων Αναργύρων, 213 00","labelId":2876},{"id":4898,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΕΡΥΜΑΝΘΟΥ","address":"250 08, Χαλανδρίτσα","labelId":2844},{"id":4899,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΕΥΠΑΛΙΟΥ","address":"330 56, Ευπάλιο","labelId":2875},{"id":4900,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΕΥΡΩΤΑ","address":"230 51, Σκάλα","labelId":2861},{"id":4901,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΕΧΙΝΟΥ","address":"673 00, Εχίνος","labelId":2830},{"id":4902,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΖΑΓΟΡΙΟΥ","address":"440 18, Κήποι","labelId":2869},{"id":4903,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΖΑΧΑΡΩΣ","address":"270 54, Ζαχάρω Ηλείας","labelId":2855},{"id":4904,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΖΗΡΟΥ","address":"Ταγμ. Βελισσαρίου 15, 482 00, Φιλιππιάδα","labelId":2877},{"id":4905,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΖΙΤΣΑΣ","address":"440 03, Ζίτσα","labelId":2869},{"id":4906,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΗΡΑΚΛΕΙΑΣ","address":"624 00, Ηράκλεια","labelId":2854},{"id":4907,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΗΡΑΚΛΕΙΔΩΝ ΚΩ","address":"Αντιμάχεια, 853 02","labelId":2878},{"id":4908,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΘΑΣΟΥ","address":"Α. Θεολογίτη 4, 640 04","labelId":2879},{"id":4909,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΘΕΟΔΩΡΟΥ ΖΙΑΚΑ","address":"511 00, Πολυνέρι","labelId":2873},{"id":4910,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΘΕΡΜΟΥ","address":"300 08, Θέρμο","labelId":2836},{"id":4912,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΙΑΛΥΣΟΥ","address":"851 01, Ιαλυσός","labelId":2863},{"id":4913,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΙΑΣΜΟΥ","address":"Ανατολικής Θράκης & Αλεξιάδη 1, 692 00","labelId":2862},{"id":4914,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΙΗΤΩΝ","address":"840 01, Ίος","labelId":2880},{"id":4915,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΙΘΑΚΗΣ","address":"Ευμαίου 14, 283 00 Βαθύ","labelId":2881},{"id":4916,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΙΣΤΙΑΙΑΣ","address":"Σαχτούρη 2, 342 00","labelId":2846},{"id":4917,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΙΤΕΑΣ","address":"Νικ. Ευθυμίου 3, 332 00","labelId":2875},{"id":4918,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΑΛΑΒΡΥΤΩΝ","address":"250 01, Καλάβρυτα","labelId":2844},{"id":4919,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΑΛΛΙΚΡΑΤΕΙΑΣ","address":"Οσίας Παρασκευής, 630 80","labelId":2838},{"id":4920,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΑΛΛΙΝΔΟΙΩΝ","address":"Μεγάλου Αλεξάνδρου 3, Ζαγκλιβέρι","labelId":2829},{"id":4921,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΑΛΛΟΝΗΣ","address":"811 07, Καλλονή","labelId":2832},{"id":4922,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΑΛΥΜΝΙΩΝ","address":"Ενορία Καλαμιώτισας, 852 00","labelId":2882},{"id":4923,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΑΜΕΝΩΝ ΒΟΥΡΛΩΝ","address":"Γυμναστηρίου 6, 350 08","labelId":2853},{"id":4924,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΑΝΤΑΝΟΥ – ΣΕΛΙΝΟΥ","address":"730 04, Κάντανος","labelId":2858},{"id":4925,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΑΡΔΑΜΥΛΩΝ","address":"823 00, Καρδάμυλα","labelId":2883},{"id":4926,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΑΡΛΟΒΑΣΙΩΝ","address":"Γοργύρας, 832 00","labelId":2884},{"id":4928,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΑΡΥΣΤΟΥ","address":"Ι.Κότσικα 13, 340 01","labelId":2846},{"id":4929,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΑΣΣΑΝΔΡΑΣ","address":"630 77, Κασσανδρεία","labelId":2838},{"id":4930,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΑΤΟΥΝΑΣ","address":"300 04, Κατούνα","labelId":2836},{"id":4931,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΑΤΩ ΝΕΥΡΟΚΟΠΙΟΥ","address":"660 33, Κ. Νευροκόπι","labelId":2822},{"id":4932,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΕΑΣ","address":"840 02, Ιουλίδος","labelId":2886},{"id":4933,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΕΝΤΡΙΚΩΝ ΤΖΟΥΜΕΡΚΩΝ","address":"Βουργαρέλι Άρτας, 470 45","labelId":2871},{"id":4934,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΙΛΕΛΕΡ","address":"415 00, Άγιοι Ανάργυροι","labelId":2827},{"id":4935,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΙΣΣΑΜΟΥ","address":"Μπαξεβάνη 13, 73400","labelId":2858},{"id":4936,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΛΕΙΤΟΡΙΑΣ","address":"250 07, Κλειτορία","labelId":2844},{"id":4937,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΟΝΙΤΣΑΣ","address":"Κ. Παπαδιαμάντη 6, 44100","labelId":2869},{"id":4938,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΟΡΩΝΗΣ","address":"240 04, Κορώνη","labelId":2870},{"id":4939,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΡΕΣΤΕΝΩΝ","address":"Πανταζοπούλου 11, 270 55","labelId":2855},{"id":4940,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΥΘΗΡΩΝ","address":"Χώρα Κυθήρων 801 00","labelId":2843},{"id":4941,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΚΥΜΗΣ","address":"Μητροπολίτου Ανανία 38, 340 03","labelId":2846},{"id":4942,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΛΕΡΟΥ","address":"Αγ. Μαρίνα Λέρου, 854 00","labelId":2882},{"id":4943,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΛΙΜΝΗΣ","address":"340 05, Λίμνη","labelId":2846},{"id":4944,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΛΙΜΝΗΣ ΠΛΑΣΤΗΡΑ","address":"Μορφοβούνι, 430 67","labelId":2887},{"id":4945,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΛΟΚΡΩΝ","address":"1ο χλμ Ε.Ο. Αταλάντης - Σκάλα Αταλάντης, 352 00","labelId":2853},{"id":4946,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΛΟΥΤΡΑΚΙΟΥ","address":"Αντ. Νικολοπούλου 4, 203 00","labelId":2840},{"id":4947,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΜΑΛΕΒΙΖΙΟΥ","address":"Διός 4, 710 05, Αμουδαρά Γαζίου","labelId":2864},{"id":4948,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΜΑΝΤΟΥΔΙΟΥ","address":"340 04, Μαντούδι","labelId":2846},{"id":4949,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΜΑΡΑΘΟΚΑΜΠΟΥ","address":"831 02, Μαραθόκαμπος","labelId":2884},{"id":4950,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΜΑΣΤΙΧΟΧΩΡΙΩΝ","address":"821 02, Καλαμωτή","labelId":2883},{"id":4951,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΜΕΓΑΛΟΠΟΛΗΣ","address":"Σταθοπούλου 37, 222 00","labelId":2867},{"id":4952,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΜΕΓΙΣΤΗΣ","address":"851 11, Μεγίστη","labelId":2863},{"id":4953,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΜΕΣΣΗΝΗΣ","address":"242 00, Μεσσήνη","labelId":2870},{"id":4954,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΜΕΤΕΩΡΩΝ","address":"Πίνδου και Ιωαννίνων, 422 00","labelId":2888},{"id":4955,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΜΕΤΣΟΒΟΥ","address":"442 00, Μέτσοβο","labelId":2869},{"id":4956,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΜΗΛΟΥ","address":"848 00, Πλάκα","labelId":2889},{"id":4957,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΜΙΝΩΑ – ΠΕΔΙΑΔΑΣ","address":"Εθνικής Αντιστασέως 51, 703 00","labelId":2864},{"id":4958,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΜΟΛΑΩΝ","address":"230 52, Μολάοι","labelId":2861},{"id":4959,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΜΟΥΔΑΝΙΩΝ","address":"28ης Οκτωβρίου και Κασσάνδρας, 632 00","labelId":2838},{"id":4960,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΜΟΥΖΑΚΙΟΥ","address":"Μ. Αλεξάνδρου, 430 60","labelId":2887},{"id":4962,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΜΥΛΟΠΟΤΑΜΟΥ","address":"Πέραμα Μυλοποτάμου, 740 52","labelId":2834},{"id":4963,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΜΥΡΙΝΑΣ","address":"814 40, Μύρινα","labelId":2891},{"id":4964,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΝΑΞΟΥ ΚΑΙ ΜΙΚΡΩΝ ΚΥΚΛΑΔΩΝ","address":"Ρ.Φεραίου & Αγ.Αρσενίου, 843 00, Χώρα Νάξου","labelId":2892},{"id":4965,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΝΑΥΠΑΚΤΙΑΣ","address":"Πάροδος Κοζώνη, 303 00","labelId":2836},{"id":5203,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΝΕΑΠΟΛΗΣ","address":"","labelId":2898},{"id":4966,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΝΕΑΣ ΖΙΧΝΗΣ","address":"620 42, Νέα Ζίχνη","labelId":2854},{"id":4967,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΝΕΜΕΑΣ","address":"Δερβενακίων 42, 205 00","labelId":2840},{"id":4968,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΝΕΣΤΟΡΙΟΥ","address":"520 51, Νεστόριο","labelId":2860},{"id":4969,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΝΕΣΤΟΥ","address":"Ελ. Βενιζέλου 104, ","labelId":2893},{"id":5202,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΝΟΤΙΑΣ ΚΕΡΚΥΡΑΣ (πρώην ΛΕΥΚΙΜΜΑΙΩΝ)","address":"490 80, Λευκίμη","labelId":2866},{"id":4970,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΝΟΤΙΑΣ ΚΥΝΟΥΡΙΑΣ","address":"223 00, Λεωνίδιο","labelId":2867},{"id":4971,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΝΟΤΙΑΣ ΡΟΔΟΥ","address":"851 09, Γεννάδιον","labelId":2863},{"id":4972,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΝΟΤΙΟΥ ΠΗΛΙΟΥ","address":"370 70, Μηλιές","labelId":2847},{"id":4973,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΞΗΡΟΜΕΡΟΥ","address":"Κεντρική Πλατεία Αστακού, 300 06","labelId":2836},{"id":4974,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΞΥΛΟΚΑΣΤΡΟΥ – ΕΥΡΩΣΤΙΝΗΣ","address":"Κ. Αδαμοπούλου 22, 204 00","labelId":2840},{"id":4975,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΟΙΧΑΛΙΑΣ","address":"240 02, Μελιγαλάς","labelId":2870},{"id":4976,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΟΡΧΟΜΕΝΟΥ","address":"Μινύου και Λόρδου Βύρωνα","labelId":2845},{"id":4977,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΑΓΓΑΙΟΥ","address":"Φρίξου Παπαχρηστίδη 166, 641 00","labelId":2893},{"id":4978,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΑΙΟΝΙΑΣ","address":"612 00, Πολύκαστρο","labelId":2872},{"id":4979,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΑΛΑΙΟΚΑΣΤΡΙΤΩΝ","address":"490 83, Παλαιοκαστρίτσα","labelId":2866},{"id":4980,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΑΛΑΜΑ","address":"Κ. Μαντοπούλου 60, 432 00","labelId":2887},{"id":4981,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΑΛΙΚΗΣ","address":"Γρ. Λαμπράκη 38, 282 00","labelId":2894},{"id":4982,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΑΞΩΝ","address":"490 82, Γάιος Παξών Κέρκυρας","labelId":2866},{"id":4983,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΑΡΑΜΥΘΙΑΣ","address":"Αγ. Δανάτου, 462 00","labelId":2895},{"id":4984,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΑΡΑΝΕΣΤΙΟΥ","address":"663 05, Παρανέστιο","labelId":2822},{"id":4985,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΑΡΟΥ","address":"Πλ. Μαντούς Μαυρογένους, 844 00","labelId":2896},{"id":4986,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΑΤΜΟΥ","address":"855 00, Πάτμος","labelId":2882},{"id":4987,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΗΝΕΙΟΥ","address":"Στρατ.Σισίνη 124, 273 00, Γαστούνη","labelId":2855},{"id":4988,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΛΑΤΑΝΙΑ","address":"730 14, Γεράνι Πλατανιά Χανίων","labelId":2858},{"id":4989,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΛΩΜΑΡΙΟΥ","address":"812 00, Πλωμάρι","labelId":2832},{"id":5188,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΟΛΙΧΝΙΤΟΥ","address":"813 00, Πολίχνιτος","labelId":2832},{"id":4990,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΟΡΟΪΩΝ","address":"620 55,  Κ. Πορόια","labelId":2854},{"id":4991,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΟΡΟΥ","address":"Πόρος 31, 180 20","labelId":2843},{"id":4992,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΡΕΣΠΩΝ","address":"530 77 , Αγ. Γερμανός","labelId":2852},{"id":4993,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΡΟΣΟΤΣΑΝΗΣ","address":"660 35, Προσοτσάνη","labelId":2822},{"id":4994,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΥΔΝΑΣ – ΚΟΛΙΝΔΡΟΥ","address":"Έναντι Νέου Σιδηροδρομικού Σταθμού Αιγινίου","labelId":2874},{"id":4995,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΥΘΑΓΟΡΕΙΟΥ","address":"Πολυκράτους 46, 831 03","labelId":2884},{"id":4996,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΥΛΗΣ","address":"25ης Μαρτίου 3 και Ανθέων, 42032","labelId":2888},{"id":4997,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΥΛΟΥ – ΝΕΣΤΟΡΟΣ","address":"210 01, Πύλος","labelId":2870},{"id":4998,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΠΩΓΩΝΙΟΥ","address":"440 02, Δελβινάκι","labelId":2869},{"id":4999,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΡΗΓΑ ΦΕΡΑΙΟΥ","address":"Υπ. Κρήνης 1, 375 00","labelId":2847},{"id":5000,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΑΜΗΣ","address":"Ι. Μεταξά 14, 280 80","labelId":2894},{"id":5001,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΑΜΟΘΡΑΚΗΣ","address":"Καμαριώτισα, 680 02","labelId":2897},{"id":5002,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΑΠΩΝ","address":"Ισοκράτους 32","labelId":2862},{"id":5003,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΕΡΒΙΩΝ","address":"117 Εθνομαρτύρων 60, 505 00","labelId":2865},{"id":5004,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΗΤΕΙΑΣ","address":"Θερίσσου 39, 723 00","labelId":2898},{"id":5005,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΙΔΗΡΟΚΑΣΤΡΟΥ","address":"623 00, Σιδηρόκαστρο","labelId":2854},{"id":5006,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΙΘΩΝΙΑΣ","address":"630 78, Άγιος Νικόλαος","labelId":2838},{"id":5007,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΙΚΥΩΝΙΩΝ","address":"Κροκίδα 52, 202 00","labelId":2840},{"id":5008,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΚΙΑΘΟΥ","address":"Περιφερειακή Οδός Σκιάθου, 370 02","labelId":2899},{"id":5009,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΚΟΠΕΛΟΥ","address":"370 03, Σκόπελος","labelId":2899},{"id":5010,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΚΥΔΡΑΣ","address":"Εθν. Αντίστασης 27, 586 00","labelId":2848},{"id":5011,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΚΥΡΟΥ","address":"Χώρα Σκύρου, 340 07","labelId":2846},{"id":5012,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΟΥΦΛΙΟΥ","address":"Μ.Παπαναστασίου 7, 684 00","labelId":2897},{"id":5013,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΟΦΑΔΩΝ","address":"Κιερίου 47, 433 00","labelId":2887},{"id":5014,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΠΕΡΧΕΙΑΔΑΣ","address":"Νικολάου Κρίκου 3, 350 03","labelId":2853},{"id":5015,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΠΕΤΣΩΝ","address":"Σάντους 1, 180 50","labelId":2843},{"id":5016,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΤΑΥΡΟΥΠΟΛΗΣ","address":"670 62, Σταυρούπολη","labelId":2830},{"id":5017,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΤΥΛΙΔΑΣ","address":"Πετρίδου 3, 353 00","labelId":2853},{"id":5018,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΥΜΗΣ","address":"856 00, Σύμη","labelId":2863},{"id":5019,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΣΦΑΚΙΩΝ","address":"730 11, Χώρα Σφακίων","labelId":2858},{"id":5020,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΤΑΝΑΓΡΑΣ","address":"Δεδάκη 27, 32 009","labelId":2845},{"id":5021,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΤΕΜΠΩΝ","address":"400 06, Ευαγγελισμός","labelId":2827},{"id":5022,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΤΗΝΟΥ","address":"842 00, Τήνος","labelId":2900},{"id":5023,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΤΟΠΕΙΡΟΥ","address":"672 00, Εύλαλο","labelId":2830},{"id":5024,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΤΡΙΓΩΝΟΥ","address":"ΔΙΚΑΙΑ","labelId":2897},{"id":5025,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΤΡΙΦΥΛΙΑΣ","address":"60ο χλμ. Ε.Ο. Πύργου - Μεθώνης, 245 00","labelId":2870},{"id":5026,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΤΡΟΙΖΗΝΑΣ","address":"Γαλατάς Τροιζήνας, 180 20","labelId":2843},{"id":5027,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΤΡΟΠΑΙΩΝ","address":"220 08, Τρόπαια","labelId":2867},{"id":5028,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΤΥΡΝΑΒΟΥ","address":"Πεζόδρομος Καρασού 6, 40100","labelId":2827},{"id":5029,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΤΥΧΕΡΟΥ","address":"Β. Γεωργίου  6,  680 03","labelId":2897},{"id":5030,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΥΔΡΑΣ","address":"Δ. Κιοσσέ,180 40","labelId":2843},{"id":5031,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΦΑΙΣΤΟΥ","address":"Λασθένους & Πανάρους 5, 704 00","labelId":2864},{"id":5032,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΦΑΝΑΡΙΟΥ","address":"Αχέροντος 33, 480 62","labelId":2877},{"id":5033,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΦΑΡΚΑΔΟΝΑΣ","address":"Μ.Μερκούρη 13, 420 31","labelId":2888},{"id":5034,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΦΑΡΣΑΛΩΝ","address":"Θέτιδος 37, 403 00","labelId":2827},{"id":5035,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΦΕΡΩΝ","address":"Μ. Αλεξάνδρου 15, 685 00","labelId":2897},{"id":5036,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΦΙΛΙΑΤΩΝ","address":"Εθνικής Αντιστάσεως 148, 463 00","labelId":2895},{"id":5037,"name":"ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΧΕΡΣΟΝΗΣΟΥ","address":"Μίνωος 8, Λιμάνι Χερσονήσου, 700 14","labelId":2864},{"id":5184,"name":"Β' ΑΣΤΥΝΟΜΙΚΟ ΤΜΗΜΑ ΗΡΑΚΛΕΙΟΥ (ΑΓΙΟΣ ΜΥΡΩΝΑΣ)","address":"Ε.Ο. Αγίας Βαρβάρας - Αγίου Μύρωνα, 700 13","labelId":2864},{"id":5052,"name":"ΤΜΗΜΑ   ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΜΦΙΣΣΑΣ - ΔΕΛΦΩΝ","address":"Λ.Σαλόνων & Κων/νου Καραμανλή, 331 00","labelId":2875},{"id":5083,"name":"ΤΜΗΜΑ  ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΘΗΒΩΝ","address":"Διρκαίου, 322 00","labelId":2845},{"id":5101,"name":"ΤΜΗΜΑ  ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΟΡΙΝΘΟΥ","address":"Ερμού 51, 201 00","labelId":2840},{"id":5108,"name":"ΤΜΗΜΑ  ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΛΙΒΑΔΕΙΑΣ","address":"Φίλωνος 51, 321 31","labelId":2845},{"id":5151,"name":"ΤΜΗΜΑ  ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΦΛΩΡΙΝΑΣ","address":"Ιωάννου Τρύπη 1, 531 00","labelId":2852},{"id":5039,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΓΙΑΣ ΒΑΡΒΑΡΑΣ","address":"Στ. Σαράφη 10, 123 51","labelId":2901},{"id":5040,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΓΙΑΣ ΠΑΡΑΣΚΕΥΗΣ","address":"Πεντέλης 10, 153 43","labelId":2902},{"id":5041,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΓΙΟΥ ΔΗΜΗΤΡΙΟΥ","address":"Αργοστολίου 39A, 173 42","labelId":2903},{"id":4836,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΓΙΟΥ ΟΡΟΥΣ","address":"630 78, Άγιο Όρος Καρυές","labelId":2838},{"id":5042,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΓΙΟΥ ΠΑΝΤΕΛΕΗΜΟΝΑ","address":"Μ. Βόδα 85, 104 40","labelId":2825},{"id":5043,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΓΙΩΝ ΑΝΑΡΓΥΡΩΝ","address":"Λ. Δημοκρατίας 49,","labelId":2901},{"id":5044,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΙΓΑΛΕΩ","address":"Παπαναστασίου & Κοραή 42, 123 41","labelId":2901},{"id":5045,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΙΓΙΑΛΕΙΑΣ","address":"Σολωμού 26, 251 00","labelId":2844},{"id":5046,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΚΡΟΠΟΛΕΩΣ","address":"ΛΕΩΦ. ΣΥΓΓΡΟΥ 83, Τ.Κ. 11485","labelId":2825},{"id":5047,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΛΕΞΑΝΔΡΕΙΑΣ","address":"Δ. Βετσόπουλου 89, 593 00","labelId":2904},{"id":5048,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΛΙΜΟΥ","address":"Θεομήτορος & Κιλκίς 50, 174 56","labelId":2903},{"id":5049,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΜΑΡΟΥΣΙΟΥ","address":"Αγίου Όρους 9, 151 23","labelId":2902},{"id":5050,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΜΠΕΛΟΚΗΠΩΝ","address":"Σεβαστουπόλεως 14, 115 26","labelId":2825},{"id":5051,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΜΠΕΛΟΚΗΠΩΝ-ΜΕΝΕΜΕΝΗΣ","address":"Θερίσου 36, 561 23","labelId":2829},{"id":5053,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΡΓΟΣΤΟΛΙΟΥ","address":"Βιομηχανική Περιοχή Αργοστολίου, 281 00","labelId":2894},{"id":5054,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΡΓΟΥΣ-ΜΥΚΗΝΩΝ","address":"Αγ. Αρτεμίου 4, 212 00","labelId":2876},{"id":5055,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΡΤΑΣ","address":"Αγίου Αρτεμίου & Ειρήνης,  471 00","labelId":2871},{"id":5056,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΣΠΡΟΠΥΡΓΟΥ","address":"Θρασυβούλου 1, 193 00","labelId":2905},{"id":4824,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΧΑΡΝΩΝ","address":"Πλήθωνος Γεμιστού 52-54,","labelId":2824},{"id":5057,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΒΑΡΗΣ – ΒΟΥΛΑΣ – ΒΟΥΛΙΑΓΜΕΝΗΣ","address":"Αφροδίτης 5, 166 71","labelId":2824},{"id":5058,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΒΕΡΟΙΑΣ","address":"Σ. Πέτρουλα 1, 591 00","labelId":2904},{"id":5059,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΒΡΙΛΗΣΣΙΩΝ","address":"Κονίτσης 35, 152 35","labelId":2902},{"id":5060,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΒΥΡΩΝΑ","address":"Αγ. Δημητρίου 25Α, 162 31","labelId":2825},{"id":4826,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΓΑΛΑΤΣΙΟΥ","address":"Ήρας 2Α, 111 47","labelId":2825},{"id":5061,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΓΛΥΦΑΔΑΣ","address":"Δούσμανη 22, 166 75","labelId":2903},{"id":5062,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΓΡΕΒΕΝΩΝ","address":"Μ. Αλεξάνδρου 83, 511 00","labelId":2873},{"id":5063,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΔΑΦΝΗΣ – ΥΜΗΤΤΟΥ","address":"Λυσίππου 20 & Κανάκη, 172 35","labelId":2825},{"id":5064,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΔΕΛΤΑ","address":"Πατριάρχου Γρηγορίου Ε’ 1Β, 574 00","labelId":2829},{"id":5065,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΔΗΜΟΤΙΚΟΥ ΘΕΑΤΡΟΥ","address":"Ηρώων Πολυτεχνείου 37, 185 32","labelId":2906},{"id":5066,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΔΙΔΥΜΟΤΕΙΧΟΥ","address":"Ευαγγέλου Νεστορίδη 2","labelId":2897},{"id":5067,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΔΙΟΝΥΣΟΥ","address":"Ηρ. Πολυτεχνείου 5,14565","labelId":2824},{"id":5068,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΔΡΑΜΑΣ","address":"Χρυσοβέργη 2, 661 33","labelId":2822},{"id":5069,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΔΥΤΙΚΗΣ ΑΧΑΪΑΣ","address":"Δασκαλοπούλου & Μαχαίρα, 252 00","labelId":2844},{"id":5070,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΕΔΕΣΣΑΣ","address":"Ηρώων Πολυτεχνείου 13, 582 00","labelId":2848},{"id":5071,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΕΛΕΥΣΙΝΑΣ","address":"Δήμητρος 26Α & Εθνικής Αντιστάσεως, 192 00","labelId":2905},{"id":5072,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΕΛΛΗΝΙΚΟΥ – ΑΡΓΥΡΟΥΠΟΛΗΣ","address":"Λ. Αργυρουπόλεως 94-96, 164 51","labelId":2903},{"id":5073,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΕΞΑΡΧΕΙΩΝ","address":"Καλλιδρομίου 12, 114 72","labelId":2825},{"id":5074,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΕΟΡΔΑΙΑΣ","address":"Τραπεζούντος 57, 502 00","labelId":2865},{"id":5075,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΖΑΚΥΝΘΟΥ","address":"Λομβάρδου 62, 291 00","labelId":2850},{"id":5077,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΖΩΓΡΑΦΟΥ","address":"Ηρώων Πολυτεχνείου 14, 157 73","labelId":2825},{"id":5078,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΗΛΙΔΑΣ","address":"Σισσίνη - Αγ.Γεωργίου, 272 00","labelId":2855},{"id":5079,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΗΛΙΟΥΠΟΛΗΣ","address":"Αγ. Κωνσταντίνου 60, 163 46","labelId":2825},{"id":5080,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΗΡΑΚΛΕΙΟΥ","address":"Χαρ. Τρικούπη 8 & Ελ. Βενιζέλου, 141 21","labelId":2902},{"id":5081,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΘΕΡΜΑΪΚΟΥ","address":"25ης Μαρτίου 9","labelId":2829},{"id":5082,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΘΕΡΜΗΣ","address":"Βασιλικά","labelId":2829},{"id":5084,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΙΕΡΑΠΕΤΡΑΣ","address":"Μαρκοπούλου 35, 722 00","labelId":2898},{"id":5085,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΙΛΙΟΥ","address":"Κωστή Παλαμά 27","labelId":2901},{"id":5086,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΑΒΑΛΑΣ","address":"Ομονοίας 119, 651 10","labelId":2893},{"id":5087,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΑΙΣΑΡΙΑΝΗΣ","address":"Σιβρισσαρίου 4, 161 21","labelId":2825},{"id":5088,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΑΛΑΜΑΡΙΑΣ","address":"Ταξιαρχών 1, 551 32","labelId":2829},{"id":5089,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΑΛΛΙΘΕΑΣ","address":"Λασκαρίδου 44, 176 76","labelId":2903},{"id":5190,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΑΜΑΤΕΡΟΥ","address":"Κάδμου και Κιλελέρ, Καματερό Τ.Κ.13451","labelId":2901},{"id":5090,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΑΜΙΝΙΩΝ - ΝΕΟΥ ΦΑΛΗΡΟΥ","address":"Χίου 22, 185 41, Καμίνια","labelId":2906},{"id":5091,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΑΡΔΙΤΣΑΣ","address":"2ο χλμ. Περ.Οδού Καρδίτσας - Τρικάλων, 431 00","labelId":2887},{"id":5092,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΑΡΠΕΝΗΣΙΟΥ","address":"Εθνικής Αντιστάσεως 9, 361 00","labelId":2842},{"id":5093,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΕΡΑΤΕΑΣ","address":"Δ. Λιούμη & Β. Παπανικολάου, Τ.Κ. 190 01","labelId":2824},{"id":5094,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΕΡΑΤΣΙΝΙΟΥ - ΔΡΑΠΕΤΣΩΝΑΣ","address":"Σωκράτους 12Β΄ & Ψαρών, 186 48","labelId":2906},{"id":5095,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΗΦΙΣΙΑΣ","address":"Όθωνος 94, 145 62","labelId":2902},{"id":5096,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΙΛΚΙΣ","address":"Ανθ/μου Γεωργίου Καμπούρογλου 3, 611 00","labelId":2872},{"id":5097,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΟΖΑΝΗΣ","address":"Λ. Ανδρέα Παπανδρέου, 501 00","labelId":2865},{"id":5098,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΟΛΩΝΟΥ","address":"Λαοδάμαντος 1-3, 104 44","labelId":2825},{"id":5099,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΟΜΟΤΗΝΗΣ","address":"Λ. Δημοκρατίας 3, 691 00","labelId":2862},{"id":5100,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΟΡΔΕΛΙΟΥ-ΕΥΟΣΜΟΥ","address":"Νυμφαίου 41, 562 24","labelId":2829},{"id":5102,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΟΡΥΔΑΛΛΟΥ","address":"Φιλικής Εταιρείας & Θερμοπυλών 1, 181 20","labelId":2906},{"id":5103,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΡΩΠΙΑΣ","address":"Αντ. Κιούση 11-13, 194 00","labelId":2824},{"id":5104,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΥΨΕΛΗΣ","address":"Θήρας 17, 112 57","labelId":2825},{"id":5105,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΩ","address":"Ακτή Μιαούλη 2, 853 00","labelId":2878},{"id":5106,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΛΑΓΚΑΔΑ","address":"Λουτρών 14, 572 00","labelId":2829},{"id":5038,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΛΑΥΡΕΩΤΙΚΗΣ","address":"Αγίας Παρακευής 20, Λαύριο","labelId":2824},{"id":5107,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΛΕΥΚΑΔΑΣ","address":"Ηρ. Πολυτεχνείου 30, 311 00","labelId":2859},{"id":4828,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΛΕΥΚΟΥ ΠΥΡΓΟΥ","address":"Δωδεκανήσου 4, 546 26","labelId":2829},{"id":5109,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΜΑΝΔΡΑΣ - ΕΙΔΥΛΛΙΑΣ","address":"Β. Δούκα & Σκουφά, 196 00","labelId":2905},{"id":5110,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΜΑΡΑΘΩΝΟΣ","address":"Λ.Διονυσίου 3,19005, Νέα Μάκρη Αττικής","labelId":2824},{"id":5111,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΜΑΡΚΟΠΟΥΛΟΥ – ΜΕΣΟΓΑΙΑΣ","address":"Λ. Πόρτο Ράφτη 72, 190 03","labelId":2824},{"id":5112,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΜΕΓΑΡΕΩΝ","address":"Αγίου Ιωάννου Θεολόγου 42, 191 00","labelId":2905},{"id":5113,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΜΕΣΟΛΟΓΓΙΟΥ","address":"Αρχιεπισκόπου Δαμασκηνού 11, 302 00","labelId":2836},{"id":5114,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΜΕΤΑΜΟΡΦΩΣΗΣ","address":"Παπαδιαμάντη 50 & Σ. Μελά, 144 51","labelId":2902},{"id":5115,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΜΟΣΧΑΤΟΥ - ΤΑΥΡΟΥ","address":"Αράχθου 15, 183 45","labelId":2903},{"id":5116,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΝΑΟΥΣΑΣ","address":"Πλ. Τρόμπακα 1, 592 00","labelId":2904},{"id":5117,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΝΑΥΠΛΙΟΥ","address":"Ελευθερίας 1-2, 211 00","labelId":2876},{"id":5118,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΝΕΑΠΟΛΗΣ-ΣΥΚΕΩΝ","address":"Εθν. Αντίστασης 10, 566 25","labelId":2829},{"id":5119,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΝΕΑΣ ΙΩΝΙΑΣ","address":"Μαδύτου 30, Νέα Ιωνία ","labelId":2902},{"id":5120,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΝΕΑΣ ΣΜΥΡΝΗΣ","address":"Ν. Πλαστήρα 99, 171 21","labelId":2903},{"id":5122,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΝΙΚΑΙΑΣ - ΑΓΙΟΥ ΙΩΑΝΝΗ ΡΕΝΤΗ","address":"Αμυδαράκη 61, 184 51","labelId":2906},{"id":5123,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΞΑΝΘΗΣ","address":"Νέστου 2Α, 671 00","labelId":2830},{"id":5124,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΟΜΟΝΟΙΑΣ","address":"Βερανζέρου 24, 104 32","labelId":2825},{"id":5125,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΑΓΚΡΑΤΙΟΥ","address":"Πρατίνου 49, 116 34","labelId":2825},{"id":5126,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΑΙΑΝΙΑΣ","address":"Καραολή Δημητρίου 68 & Υποστράτηγου Ι. Γιαννακίτσα","labelId":2824},{"id":5127,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΑΛΑΙΟΥ ΦΑΛΗΡΟΥ","address":"Αίαντος 8, 175 62","labelId":2903},{"id":5128,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΑΛΛΗΝΗΣ","address":"Θεσσαλονίκης 30& Βοιωτίας, 153 44","labelId":2824},{"id":5129,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΑΠΑΓΟΥ – ΧΟΛΑΡΓΟΥ","address":"Υμηττού 54, 155 61","labelId":2902},{"id":5130,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΑΤΗΣΙΩΝ","address":"Αγ. Λαύρας 17, 111 41","labelId":2825},{"id":5131,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΑΥΛΟΥ ΜΕΛΑ","address":"Κλεοπάτρας 6, 565 33","labelId":2829},{"id":5132,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΕΛΛΑΣ","address":"Εθν. Αντιστάσεως 7, 58100","labelId":2848},{"id":5133,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΕΝΤΕΛΗΣ","address":"25ης Μαρτίου 32Α, 151 27","labelId":2902},{"id":5134,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΕΡΑΜΑΤΟΣ","address":"Λ. Ειρήνης 170, 188 63","labelId":2906},{"id":5135,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΕΡΙΣΤΕΡΙΟΥ","address":"Καλλιδρόμου 6-8","labelId":2901},{"id":5136,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΕΤΡΟΥΠΟΛΗΣ","address":"Αγίας Γλυκερίας 74 Α, 132 31","labelId":2901},{"id":5137,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΕΥΚΗΣ – ΛΥΚΟΒΡΥΣΗΣ","address":"Κονίτσης 18, 151 21","labelId":2902},{"id":5138,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΟΛΥΓΥΡΟΥ","address":"Χαρ. Τρικούπη 41, 631 00","labelId":2838},{"id":5139,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΡΕΒΕΖΑΣ","address":"Λ. Ιωαννίνων 200, 481 00","labelId":2877},{"id":5140,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΥΛΑΙΑΣ-ΧΟΡΤΙΑΤΗ","address":"Πολυτεχνείου 18, 555 35","labelId":2829},{"id":5141,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΡΑΦΗΝΑΣ – ΠΙΚΕΡΜΙΟΥ","address":"Προποντίδος 6, 190 09","labelId":2824},{"id":5142,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΣΑΛΑΜΙΝΑΣ","address":"Δ.Σολωμού 4, 189 00","labelId":2843},{"id":4825,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΣΑΡΩΝΙΚΟΥ","address":"Κύπρου έναντι 15Α, περιοχή Χερώνες, 190 10","labelId":2824},{"id":5143,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΣΠΑΡΤΗΣ","address":"Επισκόπου & Βρεσθένης 18, 231 00","labelId":2861},{"id":5144,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΣΠΑΤΩΝ – ΑΡΤΕΜΙΔΟΣ","address":"Σπύρου Μάρκου 3, 190 04","labelId":2824},{"id":5145,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΣΥΝΤΑΓΜΑΤΟΣ","address":"Μιμνέρμου 6-8, 106 74","labelId":2825},{"id":5146,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΣΥΡΟΥ-ΕΡΜΟΥΠΟΛΗΣ","address":"Νικηφόρου Μανδηλαρά 11","labelId":2907},{"id":5147,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΤΟΥΜΠΑΣ-ΤΡΙΑΝΔΡΙΑΣ","address":"Λυκάονος 13, 543 51","labelId":2829},{"id":5149,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΤΡΙΠΟΛΗΣ","address":"Αλ. Σούτσου 29 και Γ. Σαχτούρη 20, 221 00","labelId":2867},{"id":5121,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΦΙΛΑΔΕΛΦΕΙΑΣ – ΧΑΛΚΗΔΟΝΟΣ","address":"Πίνδου 37, Νέα Φιλαδέλφεια, 143 42","labelId":2825},{"id":5150,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΦΙΛΟΘΕΗΣ – ΨΥΧΙΚΟΥ","address":"Πασχαλιάς 14, 154 52","labelId":2902},{"id":5152,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΦΥΛΗΣ","address":"Α. Βελουχιώτη - Ν. Μπελο, 133 41","labelId":2905},{"id":5153,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΧΑΪΔΑΡΙΟΥ","address":"Αγ. Γρηγορούσσης 3, 124 61","labelId":2901},{"id":5154,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΧΑΛΑΝΔΡΙΟΥ","address":"Φιλίππου Λίτσα 35, 152 32","labelId":2902},{"id":5155,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΧΑΛΚΗΔΟΝΟΣ","address":"Ρήγα Φεραίου 1, 57007","labelId":2829},{"id":5156,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΧΑΛΚΙΔΑΣ","address":"Αρεθούσης 153, 341 00","labelId":2846},{"id":5157,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΧΑΡΙΛΑΟΥ-ΑΝΑΛΗΨΕΩΣ","address":"Αλκαμένους 4, 54250","labelId":2829},{"id":5158,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΩΡΑΙΟΚΑΣΤΡΟΥ","address":"Λ. Θεσσαλονίκης & Ευτυχίας 2, 570 13","labelId":2829},{"id":5159,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΩΡΩΠΟΥ","address":"1ο ΧΛΜ Π.Ο. Καλάμου-Καπανδριτίου 19014","labelId":2824},{"id":5076,"name":"ΤΜΗΜΑ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΖΕΦΥΡΙΟΥ","address":"Εθνικής Αντιστάσεως 14, 134 61","labelId":2905},{"id":4911,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΑΣΤΥΝΟΜΙΑΣ ΘΗΡΑΣ","address":"Καρτεράδος Θήρας, 847 00","labelId":2880},{"id":4927,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΑΣΤΥΝΟΜΙΑΣ ΚΑΡΠΑΘΟΥ","address":"","labelId":2885},{"id":4961,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΑΣΤΥΝΟΜΙΑΣ ΜΥΚΟΝΟΥ","address":"Σπιτάλια Παλιός Λιμένας Μυκόνου, 846 00","labelId":2890},{"id":5160,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΓΙΟΥ ΝΙΚΟΛΑΟΥ","address":"Ερ. Σταυρού 47, 721 00","labelId":2898},{"id":5161,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΓΡΙΝΙΟΥ","address":"Μοιράρχου Τόντου Σπυρίδωνα, 30131","labelId":2836},{"id":5162,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΑΛΕΞΑΝΔΡΟΥΠΟΛΗΣ","address":"Καραϊσκάκη 6, 681 31","labelId":2897},{"id":5163,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΒΟΛΟΥ","address":"Ελ. Βενιζέλου 158 και Πεσόντων Αστυνομικών, 384 46","labelId":2847},{"id":5164,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΗΓΟΥΜΕΝΙΤΣΑΣ","address":"Αγ. Αποστόλων 5, 461 00","labelId":2895},{"id":5165,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΗΡΑΚΛΕΙΟΥ","address":"Αγ. Αρτεμίου 1, Ν.Αλικαρνασσός, 716 01","labelId":2864},{"id":5166,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΙΩΑΝΝΙΝΩΝ","address":"28ης Οκτωβρίου 11, 454 44","labelId":2869},{"id":5167,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΑΛΑΜΑΤΑΣ","address":"Ηρώων Πολυτεχνείου- Ν. Είσοδος, 241 00","labelId":2870},{"id":5168,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΑΣΤΟΡΙΑΣ","address":"Γράμμου 60, Καστοριά 521 00","labelId":2860},{"id":5169,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΑΤΕΡΙΝΗΣ","address":"1o χιλ. Παλαιάς Ε.Ο. Κατερίνης-Θεσσαλονίκης, 601 00","labelId":2874},{"id":5170,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΚΕΡΚΥΡΑΣ","address":"Ι. Ανδρεάδη 1, 491 00","labelId":2866},{"id":5171,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΛΑΜΙΑΣ","address":"Λ. Αθηνών 188, 351 00","labelId":2853},{"id":4827,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΛΑΡΙΣΑΣ","address":"Γ. Παπανδρέου 14 & Μουσών","labelId":2827},{"id":5172,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΜΥΤΙΛΗΝΗΣ","address":"Στρ. Μυριβίλλη & Μ. Κουντουρά 2, 811 00","labelId":2832},{"id":5173,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΟΡΕΣΤΙΑΔΑΣ","address":"Βασ. Κων/νου 4, 682 00","labelId":2897},{"id":5174,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΑΤΡΩΝ","address":"Ερμού 95, 26110","labelId":2844},{"id":5175,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΠΥΡΓΟΥ","address":"Διονύσου 1, 271 00","labelId":2855},{"id":5176,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΡΕΘΥΜΝΗΣ","address":"Ηρώων Πολυτεχνείου 26, 741 00","labelId":2834},{"id":5177,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΡΟΔΟΥ","address":"Εθ. Δωδεκανησίων 43, 851 00","labelId":2863},{"id":5178,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΣΑΜΟΥ","address":"Πρεσ. Δημητρίου Νικολαρεϊζη 3, 831 00","labelId":2884},{"id":5179,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΣΕΡΡΩΝ","address":"Κερασούντος 3, 621 23","labelId":2854},{"id":5148,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΤΡΙΚΑΛΩΝ","address":"Γιαννιτσών και Φαρμάκη, 421 00","labelId":2888},{"id":5180,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΧΑΝΙΩΝ","address":"Λ.Ηρακλείου 23, 731 34","labelId":2858},{"id":5181,"name":"ΥΠΟΔΙΕΥΘΥΝΣΗ ΔΙΩΞΗΣ ΚΑΙ ΕΞΙΧΝΙΑΣΗΣ ΕΓΚΛΗΜΑΤΩΝ ΧΙΟΥ","address":"Πολεμίδη 1, 821 32","labelId":2883}];
+const TIMEZONES = { 1: "07:00 - 10:30", 2: "10:30 - 14:00", 3: "14:00 - 17:30", 4: "17:30 - 21:00" };
+
+/* ==== element refs ==== */
+const $ = id => document.getElementById(id);
+const regionSel = $("region"), prefSel = $("pref"), deptList = $("deptlist");
+const statusEl = $("status"), statusText = $("statusText"), countdownEl = $("countdown");
+const logEl = $("log"), banner = $("banner");
+const urgentBox = $("urgentBox"), nearestBox = $("nearestBox");
+const startBtn = $("startBtn"), stopBtn = $("stopBtn");
+const sessionLine = $("sessionLine");
+
+/* ==== token acquisition ====
+   The radar runs on the eid.gov.gr page, where the site's ctaf framework
+   exposes the login token. The Authorization header is "ctaf2 " + ctaf.loginToken,
+   and loginToken is a LIVE property — reading it fresh each scan means we always
+   use the current token, even after the site silently refreshes it. Checks both
+   window.ctaf (when loaded via document.write) and window.parent.ctaf (when
+   loaded as an iframe overlay). Falls back to a manual paste box if neither is
+   reachable (e.g. the file opened standalone). */
+function getCtaf() {
+  try { if (window.parent && window.parent.ctaf) return window.parent.ctaf; } catch (e) {}
+  try { if (window.ctaf) return window.ctaf; } catch (e) {}
+  return null;
+}
+function getAuthToken() {
+  const manual = $("token").value.trim();
+  if (manual) return manual;
+  const ctaf = getCtaf();
+  if (ctaf && ctaf.loginToken) return "ctaf2 " + ctaf.loginToken;
+  return null;
+}
+function refreshSessionStatus() {
+  const ctaf = getCtaf();
+  if (ctaf && ctaf.loginToken) {
+    const name = ctaf.userDisplayName ? ` (${ctaf.userDisplayName})` : "";
+    sessionLine.innerHTML = `<span style="color:var(--green)">●</span> Session detected${name} — token read automatically.`;
+    $("token").style.display = "none";
+    return true;
+  }
+  sessionLine.innerHTML = `<span style="color:var(--amber)">●</span> No live session found. Paste the Authorization token below (from the network tab, incl. the <b>ctaf2</b> prefix).`;
+  $("token").style.display = "block";
+  return false;
+}
+
+/* ==== cascading selects ==== */
+function fillRegions() {
+  regionSel.innerHTML = LABELS.map(r => `<option value="${r.id}">${r.name}</option>`).join("");
+  fillPrefs();
+}
+function fillPrefs() {
+  const region = LABELS.find(r => r.id == regionSel.value);
+  prefSel.innerHTML = region.childs.map(p => `<option value="${p.id}">${p.name}</option>`).join("");
+  fillDepts();
+}
+function fillDepts() {
+  const labelId = Number(prefSel.value);
+  const depts = DEPARTMENTS.filter(d => d.labelId === labelId);
+  deptList.innerHTML = depts.map(d => `
+    <label class="dept">
+      <input type="checkbox" value="${d.id}" ${$("selall").checked ? "checked" : ""}>
+      <span>${d.name} <span class="addr">${d.address || ""}</span></span>
+    </label>`).join("");
+}
+regionSel.addEventListener("change", fillPrefs);
+prefSel.addEventListener("change", fillDepts);
+$("selall").addEventListener("change", () =>
+  deptList.querySelectorAll("input").forEach(cb => cb.checked = $("selall").checked));
+fillRegions();
+
+/* default to Rodopi if present */
+(function presetRodopi() {
+  const region = LABELS.find(r => r.childs.some(c => c.id === 2862));
+  if (region) { regionSel.value = region.id; fillPrefs(); prefSel.value = 2862; fillDepts(); }
+})();
+
+/* ==== log ==== */
+function log(msg, cls) {
+  const t = new Date().toLocaleTimeString("el-GR");
+  const line = document.createElement("div");
+  if (cls) line.className = cls;
+  line.textContent = `[${t}] ${msg}`;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+/* ==== beep ==== */
+function playBeep() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  [0, 600, 1200].forEach(delay => setTimeout(() => {
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 800; osc.type = "sine";
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.5);
+  }, delay));
+}
+$("beepBtn").addEventListener("click", playBeep);
+
+/* ==== state ==== */
+let running = false;
+let timer = null, tick = null, nextScanAt = 0;
+const seenSlots = new Set();
+
+function setStatus(mode, text) {
+  statusEl.className = "status " + mode;
+  statusText.textContent = text;
+}
+
+function showBanner(html) { banner.innerHTML = html; banner.style.display = "block"; }
+function hideBanner() { banner.style.display = "none"; }
+
+/* ==== API ==== */
+async function checkDepartment(dept, authToken) {
+  const response = await fetch("https://eid.gov.gr/appointments/api/PoliceFrontService/PD_Citizen_TimeslotsAvailable", {
+    credentials: "include",
+    headers: {
+      "Accept": "application/json",
+      "Content-Type": "application/json; charset=utf-8",
+      "Authorization": authToken,
+      "X-Requested-With": "XMLHttpRequest"
+    },
+    referrer: "https://eid.gov.gr/appointments",
+    body: JSON.stringify({ departmentId: dept.id }),
+    method: "POST",
+    mode: "cors"
+  });
+  if (response.status === 401) return { unauthorized: true };
+  if (!response.ok) return { error: "HTTP " + response.status };
+  return { data: await response.json() };
+}
+
+/* ==== render ==== */
+const fmtDate = iso => new Date(iso).toLocaleDateString("el-GR",
+  { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+
+function renderUrgent(list) {
+  urgentBox.innerHTML = list.map(a => `
+    <div class="ticket">
+      <div class="when">${fmtDate(a.date)} — ${a.timeZone}</div>
+      <div class="where">${a.department}</div>
+      <div class="addr">${a.address || ""}</div>
+    </div>`).join("");
+}
+function renderNearest(a, days) {
+  nearestBox.innerHTML = a ? `
+    <div class="nearest">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:4px">
+        Nearest available (outside ${days}-day window)</div>
+      <div class="when">${fmtDate(a.date)} — ${a.timeZone}</div>
+      <div>${a.department}</div>
+      <div class="addr">${a.address || ""}</div>
+    </div>` : "";
+}
+
+/* ==== scan ==== */
+async function scan() {
+  const authToken = getAuthToken();
+  if (!authToken) {
+    log("No token available — session not detected and nothing pasted.", "err");
+    setStatus("dead", "No token — see Session box.");
+    refreshSessionStatus();
+    return stopWatching();
+  }
+  const days = Number($("days").value) || 5;
+  const onlyNew = $("onlynew").checked;
+  const stopOnFound = $("stoponfound").checked;
+  const deadline = new Date(Date.now() + days * 864e5);
+  const chosen = [...deptList.querySelectorAll("input:checked")]
+    .map(cb => DEPARTMENTS.find(d => d.id === Number(cb.value)));
+
+  if (!chosen.length) { log("No departments selected.", "warn"); return stopWatching(); }
+
+  setStatus("scanning", `Scanning ${chosen.length} departments…`);
+  const all = [];
+
+  for (const dept of chosen) {
+    if (!running) return;
+    let result;
+    try {
+      result = await checkDepartment(dept, authToken);
+    } catch (e) {
+      log(`Network/CORS failure on ${dept.name}: ${e.message}`, "err");
+      showBanner(`<b>Request blocked.</b> The radar must run <b>inside</b> the eid.gov.gr page
+        so it shares the session. Open eid.gov.gr/appointments while logged in and launch the
+        radar with the one-line loader (see the README), rather than opening this file directly.`);
+      setStatus("dead", "Blocked — must run inside eid.gov.gr.");
+      return stopWatching();
+    }
+    if (result.unauthorized) {
+      log("401 Unauthorized — session token rejected.", "err");
+      showBanner(`<b>Session expired (401).</b> Your login on eid.gov.gr has timed out.
+        Reload the appointments page, log in again, and re-open the radar. (If you pasted a
+        manual token, grab a fresh one from the network tab.)`);
+      setStatus("dead", "Session expired — monitor stopped.");
+      playBeep();
+      return stopWatching();
+    }
+    if (result.error) { log(`${dept.name}: ${result.error}`, "warn"); continue; }
+
+    const slots = (result.data.availableDates || []).filter(s => s.percentAvailable > 0);
+    slots.forEach(s => all.push({
+      department: dept.name, address: dept.address,
+      date: s.onDate,
+      timeZone: TIMEZONES[s.zoneNum] || "Zone " + s.zoneNum,
+      key: `${dept.id}|${s.onDate}|${s.zoneNum}`
+    }));
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  all.sort((a, b) => new Date(a.date) - new Date(b.date));
+  const urgent = all.filter(a => new Date(a.date) <= deadline);
+  const toAlert = onlyNew ? urgent.filter(a => !seenSlots.has(a.key)) : urgent;
+  urgent.forEach(a => seenSlots.add(a.key));
+
+  log(`Scan done: ${all.length} open slots, ${urgent.length} within ${days} days` +
+      (onlyNew ? ` (${toAlert.length} new)` : ""), "ok");
+
+  renderUrgent(urgent);
+  renderNearest(!urgent.length && all.length ? all[0] : null, days);
+
+  if (toAlert.length) {
+    playBeep();
+    setStatus("alert", `${urgent.length} slot(s) inside the ${days}-day window — book now!`);
+    if (stopOnFound) {
+      log("Stop-on-found is on — monitor stopped. Go book it: https://eid.gov.gr/appointments", "warn");
+      return stopWatching(true);
+    }
+  }
+}
+
+/* ==== loop ==== */
+async function loop() {
+  await scan();
+  if (!running) return;
+  const mins = Math.max(1, Number($("interval").value) || 5);
+  nextScanAt = Date.now() + mins * 60000;
+  if (statusEl.className.indexOf("alert") < 0)
+    setStatus("waiting", "Watching — next sweep in");
+  timer = setTimeout(loop, mins * 60000);
+}
+
+function startWatching() {
+  if (!getAuthToken()) {
+    log("No session detected and no token pasted — cannot start.", "warn");
+    refreshSessionStatus();
+    return;
+  }
+  hideBanner();
+  running = true;
+  startBtn.disabled = true; stopBtn.disabled = false;
+  seenSlots.clear();
+  log("Monitor started.");
+  tick = setInterval(() => {
+    if (!running || !nextScanAt) return countdownEl.textContent = "";
+    const s = Math.max(0, Math.round((nextScanAt - Date.now()) / 1000));
+    countdownEl.textContent = statusEl.className.includes("waiting")
+      ? `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}` : "";
+  }, 1000);
+  loop();
+}
+
+function stopWatching(keepStatus) {
+  running = false;
+  clearTimeout(timer); clearInterval(tick);
+  nextScanAt = 0; countdownEl.textContent = "";
+  startBtn.disabled = false; stopBtn.disabled = true;
+  if (!keepStatus && !statusEl.className.includes("dead"))
+    setStatus("", "Stopped.");
+  log("Monitor stopped.");
+}
+
+startBtn.addEventListener("click", startWatching);
+stopBtn.addEventListener("click", () => stopWatching());
+
+/* detect session on load, and keep the status line honest */
+refreshSessionStatus();
+setInterval(refreshSessionStatus, 5000);
+</script>
+</body>
+</html>
